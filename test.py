@@ -1,4 +1,4 @@
-from post_mastodon import *
+from mastodon_collect import *
 
 def create_account_secrets():
     for user, user_setting in credential['mastodon_users'].items():
