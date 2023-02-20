@@ -17,53 +17,8 @@ from bs4 import BeautifulSoup
 from mastodon import Mastodon
 
 existing = plain_db.load('existing')
-with open('db/setting') as f:
-    setting = yaml.load(f, Loader=yaml.FullLoader)
-
 with open('credential') as f:
     credential = yaml.load(f, Loader=yaml.FullLoader)
-
-Day = 24 * 60 * 60
-
-def replaceTelegraphUrl(url):
-    if 'telegra.ph' not in url:
-        return url
-    if not url.startswith('http'):
-        url = 'https://' + url
-    soup = BeautifulSoup(cached_url.get(url, force_cache=True), 'html.parser')
-    try:
-        return soup.find('address').find('a')['href']
-    except:
-        return url
-
-async def getText(channel, post, key):
-    text, post = await getRawText(channel, post.post_id)
-    for entity in post.entities or []:
-        origin_text = ''.join(text[entity.offset:entity.offset + entity.length])
-        to_replace = entity.url if hasattr(entity, 'url') else origin_text
-        # to_replace = replaceTelegraphUrl(to_replace) # see if needed
-        text[entity.offset] = to_replace
-        if entity.offset + entity.length == len(text) and origin_text == 'source':
-            text[entity.offset] = '\n\n' + to_replace
-        for index in range(entity.offset + 1, entity.offset + entity.length):
-            if text[index] != '\n':
-                text[index] = ''
-    text = ''.join(text)
-    text = '\n'.join([line.strip() for line in text.split('\n')]).strip()
-    return text or key
-
-async def getMediaIds(mastodon, channel, post):
-    video = post.getVideo()
-    media_ids = []
-    if video:
-        cached_url.get(video, mode='b', force_cache=True)
-        media_ids.append(mastodon.media_post(cached_url.getFilePath(video))['id'])
-    img_number = post.getImgNumber()
-    if img_number:
-        fns = await getImages(channel, post.post_id, img_number)
-        for fn in fns:
-            media_ids.append(mastodon.media_post(fn)['id'])
-    return media_ids[:4]
 
 async def postImp(mastodon, channel, post, key):
     post_text = await getText(channel, post, key)
