@@ -6,27 +6,24 @@ import yaml
 from mastodon import Mastodon
 from telegram.ext import Updater
 import time
+import album_sender
+import mastodon_2_album
+from telegram_util import wait_timer
 
+with open('credential') as f:
+    credential = yaml.load(f, Loader=yaml.FullLoader)
 tele = Updater(credential['bot_token'], use_context=True)
 debug_group = tele.bot.get_chat(credential['debug_group'])
 tele_channel = tele.bot.get_chat(credential['tele_channel'])
 
 existing = plain_db.load('existing')
-with open('credential') as f:
-    credential = yaml.load(f, Loader=yaml.FullLoader)
-
-def getContentText(content):
-    soup = BeautifulSoup(content, 'html.parser')
-    return soup.text
 
 def shouldPost(status):
-    if existing.get(status.url):
+    if existing.get(mastodon_2_album.getUrl(status)):
         return False
-    count = status.reblogs_count
-    try:
-        count += status.reblog.reblogs_count
-    except:
-        ...
+    if existing.get(mastodon_2_album.getHash(status)):
+        return False
+    count = mastodon_2_album.getRepostCount(status)
     return count > 100 # todo
 
 def mastodon_collect():
@@ -40,7 +37,14 @@ def mastodon_collect():
         for status in statuses:
             if not shouldPost(status):
                 continue
-            print(status)
+            album = mastodon_2_album.get(status)
+            result = album_sender.send_v2(tele_channel, album)
+            wait_timer('main', len(result) * 5)
+
+            wait_timer('main', len(result) * 5)
+            existing.update(mastodon_2_album.getUrl(status), 1)
+            existing.update(mastodon_2_album.getHash(status), 1)
+
             return
         
 if __name__ == '__main__':
