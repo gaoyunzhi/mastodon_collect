@@ -8,7 +8,7 @@ from telegram.ext import Updater
 import time
 import album_sender
 import mastodon_2_album
-from telegram_util import wait_timer
+from telegram_util import wait_timer, matchKey
 
 with open('credential') as f:
     credential = yaml.load(f, Loader=yaml.FullLoader)
@@ -18,17 +18,39 @@ tele_channel = tele.bot.get_chat(credential['tele_channel'])
 
 existing = plain_db.load('existing')
 user_info = plain_db.loadLargeDB('user_info')
+blocked_words = plain_db.loadKeyOnlyDB('main_blocked_words')
+weighted_words = plain_db.loadLargeDB('main_weighted_words')
+TARGET_COUNT = 100
+
+def getRequireCount(status):
+    require = TARGET_COUNT
+    core_content = mastodon_2_album.getCoreContent(status)
+    if matchKey(core_content, blocked_words.items()):
+        return float('Inf')
+    min_weight = 1
+    for word, weight in weighted_words.items():
+        weight = float(weight)
+        if weight > 1 and word in core_content:
+            require *= weight
+        if weight < 1:
+            min_weight = min(min_weight, weight)
+    require *= min_weight
+    return require
 
 def shouldPost(status):
     if existing.get(mastodon_2_album.getUrl(status)):
         return False
     if existing.get(mastodon_2_album.getHash(status)):
         return False
+    require_count = getRequireCount(status)
     count = mastodon_2_album.getReblogsCount(status)
-    return count > 100 # todo
+    return count > require_count
+
+def getRequireAndAdjust(status):
+    return 'require: %d' % getRequireCount(status)
 
 def log(status):
-    log_message = mastodon_2_album.getLog(status)
+    log_message = mastodon_2_album.getLog(status) % getRequireAndAdjust(status)
     try:
         tele_channel.send_message(log_message, disable_web_page_preview=True, parse_mode='markdown')
     except Exception as e:
@@ -53,7 +75,7 @@ def mastodon_collect():
                 continue
             print(status)
             album = mastodon_2_album.get(status)
-            wait_timer.wait('main', len(album.imgs) * 10)
+            wait_timer.wait(tele_channel.id, len(album.imgs) * 10)
             result = album_sender.send_v2(tele_channel, album)
             log(status)
             updateUserInfo(status)
