@@ -17,14 +17,28 @@ debug_group = tele.bot.get_chat(credential['debug_group'])
 tele_channel = tele.bot.get_chat(credential['tele_channel'])
 
 existing = plain_db.load('existing')
+user_info = plain_db.loadLargeDB('user_info')
 
 def shouldPost(status):
     if existing.get(mastodon_2_album.getUrl(status)):
         return False
     if existing.get(mastodon_2_album.getHash(status)):
         return False
-    count = mastodon_2_album.getRepostCount(status)
+    count = mastodon_2_album.getReblogsCount(status)
     return count > 100 # todo
+
+def log(status):
+    log_message = mastodon_2_album.getLog(status)
+    try:
+        tele_channel.send_message(log_message, disable_web_page_preview=True, parse_mode='markdown')
+    except Exception as e:
+        if 'Timed out' in str(e):
+            return
+        tele_channel.send_message(log_message, disable_web_page_preview=True)
+
+def updateUserInfo(status):
+    for user_id, info in mastodon_2_album.yieldUsersRawInfo(status):
+        user_info.update(user_id, info)
 
 def mastodon_collect():
     mastodon = Mastodon(
@@ -37,14 +51,14 @@ def mastodon_collect():
         for status in statuses:
             if not shouldPost(status):
                 continue
+            print(status)
             album = mastodon_2_album.get(status)
+            wait_timer.wait('main', len(album.imgs) * 10)
             result = album_sender.send_v2(tele_channel, album)
-            wait_timer('main', len(result) * 5)
-
-            wait_timer('main', len(result) * 5)
+            log(status)
+            updateUserInfo(status)
             existing.update(mastodon_2_album.getUrl(status), 1)
             existing.update(mastodon_2_album.getHash(status), 1)
-
             return
         
 if __name__ == '__main__':

@@ -91,8 +91,14 @@ def getCommenter(status):
 def getUserInfo(account, key):
 	if not account:
 		return ''
-	return '[%s](%s): %s' % (key, account.url, account.display_name)
+	return '[%s](%s): %s' % (key, account.url, account.display_name or account.username)
+
+def yieldUsersRawInfo(status):
+	users = [getAuthor(status), getCommenter(status)]
+	users = [user for user in users if user]
+	for user in users:
+		yield user.id, user.acct + ' ' + user.display_name
 
 def getLog(status):
 	return 'count: %d %s %s' % (getReblogsCount(status), 
-		getUserInfo(getAuthor(status), 'author'), getUserInfo(getAuthor(status), 'commenter')
+		getUserInfo(getAuthor(status), 'author'), getUserInfo(getCommenter(status), 'commenter'))
