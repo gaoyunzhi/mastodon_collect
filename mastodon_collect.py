@@ -74,6 +74,8 @@ def mastodon_collect():
             if not shouldPost(status):
                 continue
             print(status)
+            print('')
+            print(mastodon_2_album.getCoreContent(status))
             album = mastodon_2_album.get(status)
             wait_timer.wait(tele_channel.id, len(album.imgs) * 10)
             result = album_sender.send_v2(tele_channel, album)

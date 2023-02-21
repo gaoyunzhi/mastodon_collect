@@ -20,6 +20,8 @@ def getReblogsCountRaw(status):
 
 def getContentText(content):
     soup = BeautifulSoup(content, 'html.parser')
+    content = str(soup).replace('<br/>', '\n')
+    soup = BeautifulSoup(content, 'html.parser')
     return soup.text
 
 def getMediaAttachments(status):
@@ -28,7 +30,14 @@ def getMediaAttachments(status):
         media_attachments += status.reblog.media_attachments
     except:
         ...
-    return media_attachments
+    deduped_media_attachments = []
+    media_ids = set()
+    for media in media_attachments:
+    	if media.id in media_ids:
+    		continue
+    	deduped_media_attachments.append(media)
+    	media_ids.add(media.id)
+    return deduped_media_attachments
 
 def getImages(status):
     media_attachments = getMediaAttachments(status)
@@ -60,7 +69,7 @@ def getCap(status):
     return origin_cap + '\n\n【网评】' + cap
 
 def getUrl(status):
-    if status.url:
+    if status.url and not status.url.endswith('/activity'):
         return status.url
     return status.reblog.url
 
