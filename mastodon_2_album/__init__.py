@@ -22,7 +22,13 @@ def getContentText(content):
     soup = BeautifulSoup(content, 'html.parser')
     content = str(soup).replace('<br/>', '\n')
     soup = BeautifulSoup(content, 'html.parser')
-    return soup.text
+    result = []
+    for paragraph in soup.find_all('p'):
+        text = paragraph.text
+        if len(text.split()) == 1 and text.startswith('@'):
+            continue
+        result.append(text)
+    return '\n\n'.join(result)
 
 def getMediaAttachments(status):
     media_attachments = status.media_attachments
