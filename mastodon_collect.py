@@ -8,7 +8,7 @@ from telegram.ext import Updater
 import time
 import album_sender
 import mastodon_2_album
-from telegram_util import wait_timer, matchKey
+from telegram_util import wait_timer, matchKey, send_message
 
 with open('credential') as f:
     credential = yaml.load(f, Loader=yaml.FullLoader)
@@ -47,16 +47,11 @@ def shouldPost(status):
     return count > require_count
 
 def getRequireAndAdjust(status):
-    return 'require: %d' % getRequireCount(status)
+    return 'require: %d ' % getRequireCount(status)
 
 def log(status):
     log_message = mastodon_2_album.getLog(status) % getRequireAndAdjust(status)
-    try:
-        tele_channel.send_message(log_message, disable_web_page_preview=True, parse_mode='markdown')
-    except Exception as e:
-        if 'Timed out' in str(e):
-            return
-        tele_channel.send_message(log_message, disable_web_page_preview=True)
+    send_message(tele_channel, log_message)
 
 def updateUserInfo(status):
     for user_id, info in mastodon_2_album.yieldUsersRawInfo(status):
