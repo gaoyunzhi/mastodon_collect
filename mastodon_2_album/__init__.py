@@ -83,7 +83,7 @@ def get(status):
     r = Result()
     r.imgs = getImages(status)
     r.video = getVideo(status)
-    r.cap = getCap(status)
+    r.cap_html_v2 = getCap(status)
     r.url = getUrl(status)
     return r
 
@@ -114,7 +114,7 @@ def getCommenter(status):
 def getUserInfo(account, key):
     if not account:
         return ''
-    return '[%s](%s): %s' % (key, account.url, account.display_name or account.username)
+    return '[%s](%s): %s %s' % (key, account.url, account.display_name or account.username, account.url)
 
 def yieldUsersRawInfo(status):
     users = [getCommenter(status), getAuthor(status)]
