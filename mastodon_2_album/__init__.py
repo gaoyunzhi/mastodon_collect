@@ -114,7 +114,7 @@ def getCommenter(status):
 def getUserInfo(account, key):
     if not account:
         return ''
-    return '[%s](%s): %s %s' % (key, account.url, account.display_name or account.username, account.url)
+    return '[%s](%s): %s %d' % (key, account.url, account.display_name or account.username, account.id)
 
 def yieldUsersRawInfo(status):
     users = [getCommenter(status), getAuthor(status)]
@@ -128,7 +128,7 @@ def getLog(status):
 
 def getCoreContent(status):
     result = []
-    for _, x in yieldUsersRawInfo(status):
-        result.append(x)
+    for user_id, user_info in yieldUsersRawInfo(status):
+        result.append('%d %s' % (user_id, user_info))
     result += [getContentText(status.content), getOriginCap(status)]
     return '=' + ' '.join(result)
