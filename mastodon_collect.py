@@ -15,11 +15,13 @@ with open('credential') as f:
 tele = Updater(credential['bot_token'], use_context=True)
 debug_group = tele.bot.get_chat(credential['debug_group'])
 tele_channel = tele.bot.get_chat(credential['tele_channel'])
+monitor_words_channel = tele.bot.get_chat(credential['monitor_words_channel'])
 
 existing = plain_db.load('existing')
 user_info = plain_db.loadLargeDB('user_info')
 blocked_words = plain_db.loadKeyOnlyDB('main_blocked_words')
 weighted_words = plain_db.loadLargeDB('main_weighted_words')
+monitor_words = plain_db.loadKeyOnlyDB('monitor_words')
 TARGET_COUNT = 100
 
 def getRequireCount(status):
@@ -49,14 +51,26 @@ def shouldPost(status):
 def getRequireAndAdjust(status):
     return 'require: %d ' % getRequireCount(status)
 
-def log(status):
+def log(chat, status):
     log_message = mastodon_2_album.getLog(status) % getRequireAndAdjust(status)
-    send_message(tele_channel, log_message)
+    send_message(chat, log_message)
 
 def updateUserInfo(status):
     for user_id, info in mastodon_2_album.yieldUsersRawInfo(status):
         user_info.update(user_id, info)
 
+def shouldMonitor(status):
+    if monitor_words.contain(mastodon_2_album.getAuthor(status).url.split('/')[3]) and not mastodon_2_album.getCommenter():
+        return False   
+    core_content = mastodon_2_album.getCoreContent(status)     
+    return matchKey(core_content, monitor_words.items())
+
+def getChannel(status):
+    if shouldMonitor(status):
+        return monitor_words_channel
+    if shouldPost(status):
+        return tele_channel
+    
 def mastodon_collect():
     mastodon = Mastodon(
         access_token = 'db/main_mastodon_secret',
@@ -66,15 +80,16 @@ def mastodon_collect():
     for user in mastodon.account_following(my_id, limit=80):
         statuses = mastodon.account_statuses(user.id, limit=40)
         for status in statuses:
-            if not shouldPost(status):
+            chat = getChannel(status)
+            if not chat:
                 continue
             print(status)
             print('')
             print(mastodon_2_album.getCoreContent(status))
             album = mastodon_2_album.get(status)
-            wait_timer.wait(tele_channel.id, len(album.imgs) * 10)
-            result = album_sender.send_v2(tele_channel, album)
-            log(status)
+            wait_timer.wait(chat.id, len(album.imgs) * 10)
+            result = album_sender.send_v2(chat, album)
+            log(chat, status)
             updateUserInfo(status)
             existing.update(mastodon_2_album.getUrl(status), 1)
             existing.update(mastodon_2_album.getHash(status), 1)
