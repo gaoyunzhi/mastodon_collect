@@ -60,9 +60,14 @@ def getRequireAndAdjust(status):
 
 def log(chat, status, add_url_in_log):
     additional_info = ''
+    log_message = ''
     if chat.id == tele_channel.id:
         additional_info = getRequireAndAdjust(status)
-    log_message = mastodon_2_album.getLog(status) % additional_info
+    try:
+        log_message = mastodon_2_album.getLog(status) % additional_info
+    except Exception as e:
+        print('mastodon_collect log_message exception (try resolving)', mastodon_2_album.getUrl(status), mastodon_2_album.getLog(status), additional_info, e)
+        log_message = mastodon_2_album.getLog(status) + ' ' + additional_info
     if add_url_in_log:
         log_message += ' ' + mastodon_2_album.getUrl(status)
     send_message(chat, log_message)
@@ -98,8 +103,12 @@ def getFollowing(mastodon):
     for account in followings:
         yield account
 
-def getFollowings(mastodon, account_ids):
+def getFollowings(mastodon, accounts):
     exist = set()
+    for account in accounts:
+        exist.add(account.id)
+        yield account    
+    account_ids = list(exist)
     random.shuffle(account_ids)
     for account_id in account_ids:
         followings = mastodon.account_following(account_id, limit=80)
@@ -137,8 +146,7 @@ def mastodonCollect():
         access_token = 'db/main_mastodon_secret',
         api_base_url = credential['mastodon_domain']
     )
-    following_ids = [account.id for account in getFollowing(mastodon)]
-    followings_followings = getFollowings(mastodon, following_ids)
+    followings_followings = getFollowings(mastodon, getFollowing(mastodon))
     for account in followings_followings: # testing
     # for account in getFollowing(mastodon): 
         mastodonSingleCollect(mastodon, account.id)
