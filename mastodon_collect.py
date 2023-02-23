@@ -58,11 +58,13 @@ def getRequireAndAdjust(status):
     result += ''.join(['%s(%s) ' % (w[2], w[1]) for w in weights])
     return result
 
-def log(chat, status):
+def log(chat, status, add_url_in_log):
     additional_info = ''
     if chat.id == tele_channel.id:
         additional_info = getRequireAndAdjust(status)
     log_message = mastodon_2_album.getLog(status) % additional_info
+    if add_url_in_log:
+        log_message += ' ' + mastodon_2_album.getUrl(status)
     send_message(chat, log_message)
 
 def updateUserInfo(status):
@@ -73,7 +75,7 @@ def shouldMonitor(status):
     if monitor_words.contain(mastodon_2_album.getAuthor(status).url.split('/')[3][1:]):
         if not mastodon_2_album.getCommenter(status):
             return False
-        if not mastodon_2_album.getContentText(status.content):
+        if not mastodon_2_album.getContentText(status):
             return False   
     core_content = mastodon_2_album.getCoreContent(status)     
     return matchKey(core_content, monitor_words.items())
@@ -96,19 +98,36 @@ def getFollowing(mastodon):
     for account in followings:
         yield account
 
+def getFollowings(mastodon, account_ids):
+    exist = set()
+    random.shuffle(account_ids)
+    for account_id in account_ids:
+        followings = mastodon.account_following(account_id, limit=80)
+        for account in followings:
+            if account.id in exist:
+                continue
+            yield account
+            exist.add(account.id)
+
 def mastodonSingleCollect(mastodon, account_id):
     statuses = mastodon.account_statuses(account_id, limit=40)
     for status in statuses:
         chat = getChannel(status)
         if not chat:
             continue
-        print(status)
-        print('')
-        print(mastodon_2_album.getCoreContent(status))
+        # print(status)
+        # print('')
+        # print(mastodon_2_album.getCoreContent(status))
         album = mastodon_2_album.get(status)
-        wait_timer.wait(chat.id, len(album.imgs) * 10)
-        result = album_sender.send_v2(chat, album)
-        log(chat, status)
+        len_imgs = len(album.imgs)
+        wait_timer.wait(chat.id, len_imgs * 10 + len_imgs * len_imgs)
+        add_url_in_log = False
+        try:
+            album_sender.send_v2(chat, album)
+        except Exception as e:
+            print('mastodon_collect send fail', mastodon_2_album.getUrl(status), e)
+            add_url_in_log = True
+        log(chat, status, add_url_in_log=add_url_in_log)
         updateUserInfo(status)
         existing.update(mastodon_2_album.getUrl(status), 1)
         existing.update(mastodon_2_album.getHash(status), 1)
@@ -118,8 +137,11 @@ def mastodonCollect():
         access_token = 'db/main_mastodon_secret',
         api_base_url = credential['mastodon_domain']
     )
-    for account in getFollowing(mastodon):
-        result = mastodonSingleCollect(mastodon, account.id)
+    following_ids = [account.id for account in getFollowing(mastodon)]
+    followings_followings = getFollowings(mastodon, following_ids)
+    for account in followings_followings: # testing
+    # for account in getFollowing(mastodon): 
+        mastodonSingleCollect(mastodon, account.id)
 
 if __name__ == '__main__':
     mastodon_collect()
