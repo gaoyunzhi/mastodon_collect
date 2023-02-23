@@ -21,6 +21,7 @@ existing = plain_db.load('existing')
 user_info = plain_db.loadLargeDB('user_info')
 blocked_words = plain_db.loadKeyOnlyDB('main_blocked_words')
 weighted_words = plain_db.loadLargeDB('main_weighted_words')
+following = plain_db.loadLargeDB('following')
 monitor_words = plain_db.loadKeyOnlyDB('monitor_words')
 TARGET_COUNT = 100
 
@@ -40,19 +41,27 @@ def getRequireCount(status):
     return require
 
 def shouldPost(status):
-    if existing.get(mastodon_2_album.getUrl(status)):
-        return False
-    if existing.get(mastodon_2_album.getHash(status)):
-        return False
     require_count = getRequireCount(status)
     count = mastodon_2_album.getReblogsCount(status)
     return count > require_count
 
 def getRequireAndAdjust(status):
-    return 'require: %d ' % getRequireCount(status)
+    result = 'require: %d ' % getRequireCount(status)
+    core_content = mastodon_2_album.getCoreContent(status)
+    weights = []
+    for word, raw_weight in weighted_words.items():
+        weight = float(raw_weight)
+        if (not 0.9 < weight < 1.1) and word in core_content:
+            weights.append((weight, raw_weight, word))
+    weights.sort()
+    result += ''.join(['%s(%s) ' % (w[2], w[1]) for w in weights])
+    return result
 
 def log(chat, status):
-    log_message = mastodon_2_album.getLog(status) % getRequireAndAdjust(status)
+    additional_info = ''
+    if chat.id == tele_channel.id:
+        additional_info = getRequireAndAdjust(status)
+    log_message = mastodon_2_album.getLog(status) % additional_info
     send_message(chat, log_message)
 
 def updateUserInfo(status):
@@ -60,24 +69,36 @@ def updateUserInfo(status):
         user_info.update(user_id, info)
 
 def shouldMonitor(status):
-    if monitor_words.contain(mastodon_2_album.getAuthor(status).url.split('/')[3]) and not mastodon_2_album.getCommenter():
-        return False   
+    if monitor_words.contain(mastodon_2_album.getAuthor(status).url.split('/')[3][1:]):
+        if not mastodon_2_album.getCommenter(status):
+            return False
+        if not mastodon_2_album.getContentText(status.content):
+            return False   
     core_content = mastodon_2_album.getCoreContent(status)     
     return matchKey(core_content, monitor_words.items())
 
 def getChannel(status):
+    if existing.get(mastodon_2_album.getUrl(status)):
+        return 
+    if existing.get(mastodon_2_album.getHash(status)):
+        return 
     if shouldMonitor(status):
         return monitor_words_channel
     if shouldPost(status):
         return tele_channel
-    
+
+def getFollowing(mastodon):
+    for item in following.items():
+        yield mastodon.account(int(item))
+    for account in mastodon.account_following(mastodon.me().id, limit=80):
+        yield account
+
 def mastodon_collect():
     mastodon = Mastodon(
         access_token = 'db/main_mastodon_secret',
         api_base_url = credential['mastodon_domain']
     )
-    my_id = mastodon.me().id
-    for user in mastodon.account_following(my_id, limit=80):
+    for user in getFollowing(mastodon):
         statuses = mastodon.account_statuses(user.id, limit=40)
         for status in statuses:
             chat = getChannel(status)
