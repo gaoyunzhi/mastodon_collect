@@ -9,6 +9,7 @@ import time
 import album_sender
 import mastodon_2_album
 from telegram_util import wait_timer, matchKey, send_message
+import random
 
 with open('credential') as f:
     credential = yaml.load(f, Loader=yaml.FullLoader)
@@ -19,9 +20,9 @@ monitor_words_channel = tele.bot.get_chat(credential['monitor_words_channel'])
 
 existing = plain_db.load('existing')
 user_info = plain_db.loadLargeDB('user_info')
-blocked_words = plain_db.loadKeyOnlyDB('main_blocked_words')
-weighted_words = plain_db.loadLargeDB('main_weighted_words')
-following = plain_db.loadLargeDB('following')
+blocked_words = plain_db.loadKeyOnlyDB('blocked_words')
+weighted_words = plain_db.loadLargeDB('weighted_words')
+following = plain_db.loadKeyOnlyDB('following')
 monitor_words = plain_db.loadKeyOnlyDB('monitor_words')
 TARGET_COUNT = 100
 
@@ -90,31 +91,35 @@ def getChannel(status):
 def getFollowing(mastodon):
     for item in following.items():
         yield mastodon.account(int(item))
-    for account in mastodon.account_following(mastodon.me().id, limit=80):
+    followings = mastodon.account_following(mastodon.me().id, limit=80)
+    random.shuffle(followings)
+    for account in followings:
         yield account
 
-def mastodon_collect():
+def mastodonSingleCollect(mastodon, account_id):
+    statuses = mastodon.account_statuses(account_id, limit=40)
+    for status in statuses:
+        chat = getChannel(status)
+        if not chat:
+            continue
+        print(status)
+        print('')
+        print(mastodon_2_album.getCoreContent(status))
+        album = mastodon_2_album.get(status)
+        wait_timer.wait(chat.id, len(album.imgs) * 10)
+        result = album_sender.send_v2(chat, album)
+        log(chat, status)
+        updateUserInfo(status)
+        existing.update(mastodon_2_album.getUrl(status), 1)
+        existing.update(mastodon_2_album.getHash(status), 1)
+        
+def mastodonCollect():
     mastodon = Mastodon(
         access_token = 'db/main_mastodon_secret',
         api_base_url = credential['mastodon_domain']
     )
-    for user in getFollowing(mastodon):
-        statuses = mastodon.account_statuses(user.id, limit=40)
-        for status in statuses:
-            chat = getChannel(status)
-            if not chat:
-                continue
-            print(status)
-            print('')
-            print(mastodon_2_album.getCoreContent(status))
-            album = mastodon_2_album.get(status)
-            wait_timer.wait(chat.id, len(album.imgs) * 10)
-            result = album_sender.send_v2(chat, album)
-            log(chat, status)
-            updateUserInfo(status)
-            existing.update(mastodon_2_album.getUrl(status), 1)
-            existing.update(mastodon_2_album.getHash(status), 1)
-            return
-        
+    for account in getFollowing(mastodon):
+        result = mastodonSingleCollect(mastodon, account.id)
+
 if __name__ == '__main__':
     mastodon_collect()

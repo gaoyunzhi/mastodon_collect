@@ -23,7 +23,7 @@ def create_account_secrets():
         print(3)
 
 def test():
-    mastodon_collect()
+    mastodonCollect()
 
 if __name__ == '__main__':
     # create_account_secrets()
