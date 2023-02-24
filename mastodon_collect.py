@@ -152,4 +152,4 @@ def mastodonCollect():
         mastodonSingleCollect(mastodon, account.id)
 
 if __name__ == '__main__':
-    mastodon_collect()
+    mastodonCollect()
