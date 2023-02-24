@@ -10,6 +10,8 @@ import album_sender
 import mastodon_2_album
 from telegram_util import wait_timer, matchKey, send_message
 import random
+import warnings
+warnings.filterwarnings('ignore')
 
 with open('credential') as f:
     credential = yaml.load(f, Loader=yaml.FullLoader)
