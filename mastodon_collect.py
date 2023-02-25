@@ -97,10 +97,19 @@ def getChannel(status):
     if shouldPost(status):
         return tele_channel
 
+def fetchAll(result, limit=80):
+    while len(result) == limit:
+        for item in result:
+            yield item
+        result = mastodon.fetch_next(result)
+        print('fetched next', len(result))
+    for item in result:
+        yield item
+
 def getFollowing(mastodon):
     for item in following.items():
         yield mastodon.account(int(item))
-    followings = mastodon.account_following(mastodon.me().id, limit=80)
+    followings = fetchAll(mastodon.account_following(mastodon.me().id, limit=80), limit=80)
     random.shuffle(followings)
     for account in followings:
         yield account
@@ -114,7 +123,7 @@ def getFollowings(mastodon, accounts):
     random.shuffle(account_ids)
     for account_id in account_ids:
         followings = mastodon.account_following(account_id, limit=80)
-        for account in followings:
+        for account in fetchAll(followings, limit=80):
             if account.id in exist:
                 continue
             yield account
