@@ -98,12 +98,12 @@ def getChannel(status):
         return tele_channel
 
 def fetchAll(mastodon, result, limit=80):
-    print('fetched first', len(result))
+    # print('fetched first', len(result))
     while len(result) == limit:
         for item in result:
             yield item
         result = mastodon.fetch_next(result)
-        print('fetched next', len(result))
+        # print('fetched next', len(result))
     for item in result:
         yield item
 
@@ -163,6 +163,7 @@ def mastodonCollect():
     for account in followings_followings: # testing
     # for account in getFollowing(mastodon): 
         mastodonSingleCollect(mastodon, account.id)
+    print('mastodon_collect finish')
 
 if __name__ == '__main__':
     mastodonCollect()
