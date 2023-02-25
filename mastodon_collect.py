@@ -98,6 +98,7 @@ def getChannel(status):
         return tele_channel
 
 def fetchAll(mastodon, result, limit=80):
+    print('fetched first', len(result))
     while len(result) == limit:
         for item in result:
             yield item
