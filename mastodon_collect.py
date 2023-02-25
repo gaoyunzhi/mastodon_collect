@@ -109,7 +109,7 @@ def fetchAll(result, limit=80):
 def getFollowing(mastodon):
     for item in following.items():
         yield mastodon.account(int(item))
-    followings = fetchAll(mastodon.account_following(mastodon.me().id, limit=80), limit=80)
+    followings = list(fetchAll(mastodon.account_following(mastodon.me().id, limit=80), limit=80))
     random.shuffle(followings)
     for account in followings:
         yield account
